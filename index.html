@@ -1,129 +1,444 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <title>Kabel‑Info</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f5f7">
+  <title>Kabel-Info</title>
+
   <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f5f7;
+      --card: #ffffff;
+      --text: #16181d;
+      --muted: #68707c;
+      --line: #e4e7eb;
+      --accent: #1267d6;
+      --good: #16803c;
+      --warn: #b26700;
+      --bad: #b42318;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      padding: 20px;
-      background: #f5f5f5;
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
-    .card {
-      max-width: 500px;
+
+    main {
+      width: min(100%, 650px);
       margin: 0 auto;
-      background: #fff;
-      border-radius: 10px;
-      padding: 16px 18px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: max(28px, env(safe-area-inset-top))
+        18px
+        max(28px, env(safe-area-inset-bottom));
     }
+
+    .card {
+      overflow: hidden;
+      background: var(--card);
+      border-radius: 22px;
+      box-shadow: 0 10px 30px rgba(20, 30, 45, 0.10);
+    }
+
+    .header {
+      padding: 25px 23px 20px;
+      background: linear-gradient(135deg, #ffffff, #f4f8ff);
+    }
+
     h1 {
-      font-size: 1.3rem;
-      margin: 0 0 10px 0;
+      margin: 0;
+      font-size: clamp(1.55rem, 7vw, 2.15rem);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
     }
+
+    .subtitle {
+      display: none;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    #content {
+      border-top: 1px solid var(--line);
+    }
+
     .row {
-      margin: 6px 0;
-      line-height: 1.35;
+      padding: 15px 23px;
+      border-bottom: 1px solid var(--line);
     }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
     .label {
-      font-weight: 600;
-      color: #444;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 750;
+      letter-spacing: 0.075em;
+      line-height: 1.2;
+      text-transform: uppercase;
     }
+
+    .value {
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 1.03rem;
+      font-weight: 500;
+      line-height: 1.42;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .row-signalweg .value,
+    .row-via .value {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 1.10rem;
+    }
+
+    .status-ok {
+      color: var(--good);
+      font-weight: 750;
+    }
+
+    .status-warn {
+      color: var(--warn);
+      font-weight: 750;
+    }
+
+    .status-bad {
+      color: var(--bad);
+      font-weight: 750;
+    }
+
     .error {
-      color: #b00020;
-      font-weight: 600;
+      padding: 23px;
+      color: var(--bad);
+      font-weight: 650;
+      line-height: 1.45;
+    }
+
+    .hint {
+      padding: 0 23px 22px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #edf0f4;
+      color: #25313f;
+      font-size: 0.86em;
     }
   </style>
 </head>
+
 <body>
-  <div class="card" id="card">
-    <h1 id="title">Lade…</h1>
-    <div id="content"></div>
-  </div>
+  <main>
+    <section class="card">
+      <header class="header">
+        <h1 id="title">Kabel-Info</h1>
+        <div id="subtitle" class="subtitle"></div>
+      </header>
+
+      <div id="content"></div>
+    </section>
+  </main>
 
   <script>
-    // Hilfsfunktion: Query-Parameter auslesen
-    function getQueryParam(name) {
-      const params = new URLSearchParams(window.location.search);
-      return params.get(name);
+    /*
+      Unterstützte Kurzparameter, zum Beispiel:
+
+      ?id=FOH-DANTE-004
+      &st=ready
+      &cat=audio-digital
+      &src=Yamaha-QL5-Dante-A-09-16
+      &via=FOH-SW-A-Gi1-0-12
+      &dst=Tio1608D-A-Port-01
+      &typ=CAT6A-SFTP-EtherCON
+      &len=30m
+      &col=blue
+      &con=NE8MX6
+      &vlan=20
+      &red=no
+      &inv=AV-CAT6A-004
+      &test=2026-09-25
+      &owner=AV-Team
+      &loc=FOH-to-Stage-North
+      &use=Main-PA-Dante-Primary
+      &note=Keep-away-from-dimmer-power-lines
+    */
+
+    const labels = {
+      id: "Kabel-ID",
+
+      st: "Status",
+      status: "Status",
+
+      cat: "Kategorie",
+      kategorie: "Kategorie",
+
+      src: "Signalquelle",
+      signalquelle: "Signalquelle",
+
+      via: "Signalweg über",
+      signalweg: "Signalweg",
+
+      dst: "Ziel / Anschluss",
+      ziel: "Ziel / Anschluss",
+
+      typ: "Kabeltyp",
+      type: "Kabeltyp",
+      kabeltyp: "Kabeltyp",
+
+      len: "Länge",
+      laenge: "Länge",
+
+      col: "Farbe",
+      farbe: "Farbe",
+
+      con: "Steckverbinder",
+      stecker: "Steckverbinder",
+
+      vlan: "VLAN / Netzwerk",
+
+      red: "Redundanz",
+      redundanz: "Redundanz",
+
+      inv: "Inventar-Nr.",
+      inventar: "Inventar-Nr.",
+
+      test: "Letzter Test",
+      letzter_test: "Letzter Test",
+
+      owner: "Verantwortlich",
+      loc: "Einsatzort",
+      use: "Verwendung",
+
+      note: "Notiz",
+      notiz: "Notiz"
+    };
+
+    const order = [
+      "id",
+
+      "st",
+      "status",
+
+      "cat",
+      "kategorie",
+
+      "src",
+      "signalquelle",
+
+      "via",
+      "signalweg",
+
+      "dst",
+      "ziel",
+
+      "typ",
+      "type",
+      "kabeltyp",
+
+      "len",
+      "laenge",
+
+      "col",
+      "farbe",
+
+      "con",
+      "stecker",
+
+      "vlan",
+
+      "red",
+      "redundanz",
+
+      "inv",
+      "inventar",
+
+      "test",
+      "letzter_test",
+
+      "owner",
+      "loc",
+      "use",
+
+      "note",
+      "notiz"
+    ];
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
-    // Hauptlogik
+    function prettyValue(key, value) {
+      const statusValues = {
+        ready: "Einsatzbereit",
+        ok: "Einsatzbereit",
+        "1": "Einsatzbereit",
+        check: "Prüfen",
+        warn: "Prüfen",
+        fault: "Defekt / gesperrt",
+        bad: "Defekt / gesperrt",
+        "0": "Defekt / gesperrt"
+      };
+
+      if (key === "st" || key === "status") {
+        return statusValues[value.toLowerCase()] || value;
+      }
+
+      if (key === "red" || key === "redundanz") {
+        const redundancyValues = {
+          yes: "Ja",
+          no: "Nein",
+          "1": "Ja",
+          "0": "Nein"
+        };
+
+        return redundancyValues[value.toLowerCase()] || value;
+      }
+
+      /*
+        Bindestriche dienen in der NFC-URL als platzsparender
+        Ersatz für Leerzeichen. Diese Zeile formatiert sie lesbar.
+      */
+      return value.replaceAll("-", " ");
+    }
+
+    function statusClass(key, rawValue) {
+      if (key !== "st" && key !== "status") {
+        return "";
+      }
+
+      const value = rawValue.toLowerCase();
+
+      if (["ready", "ok", "1"].includes(value)) {
+        return "status-ok";
+      }
+
+      if (["check", "warn"].includes(value)) {
+        return "status-warn";
+      }
+
+      if (["fault", "bad", "0"].includes(value)) {
+        return "status-bad";
+      }
+
+      return "";
+    }
+
+    function rowClass(key) {
+      if (key === "signalweg" || key === "via") {
+        return "row-signalweg";
+      }
+
+      return "row-" + key;
+    }
+
     function render() {
-      const name = getQueryParam('name');
-      const signal = getQueryParam('signal');
-      const typ = getQueryParam('typ');
-      const laenge = getQueryParam('laenge');
-      const ziel = getQueryParam('ziel');
-      const notiz = getQueryParam('notiz');
+      const params = new URLSearchParams(window.location.search);
 
-      const titleEl = document.getElementById('title');
-      const contentEl = document.getElementById('content');
+      const content = document.getElementById("content");
+      const title = document.getElementById("title");
+      const subtitle = document.getElementById("subtitle");
 
-      if (!name && !signal && !typ) {
-        titleEl.textContent = 'Keine Daten';
-        contentEl.innerHTML =
-          '<p class="error">Diese Seite erwartet URL‑Parameter, z. B.:<br>' +
-          '<code>?name=Kabel%20001&amp;signal=...&amp;typ=...</code></p>';
+      const cableId = params.get("id");
+
+      if (cableId) {
+        title.textContent = cableId;
+        subtitle.textContent = "Kabel-Information";
+        subtitle.style.display = "block";
+      }
+
+      const output = [];
+      const shown = new Set();
+
+      for (const key of order) {
+        const rawValue = params.get(key);
+
+        if (!rawValue || shown.has(key)) {
+          continue;
+        }
+
+        /*
+          Die Kabel-ID steht bereits oben als Seitentitel.
+          Daher wird sie nicht noch einmal als Zeile ausgegeben.
+        */
+        if (key === "id") {
+          shown.add(key);
+          continue;
+        }
+
+        const label = labels[key] || key;
+        const value = prettyValue(key, rawValue);
+        const valueClass = statusClass(key, rawValue);
+
+        output.push(`
+          <div class="row ${rowClass(key)}">
+            <div class="label">${escapeHtml(label)}</div>
+            <div class="value ${valueClass}">
+              ${escapeHtml(value)}
+            </div>
+          </div>
+        `);
+
+        shown.add(key);
+      }
+
+      /*
+        Auch unbekannte Parameter ausgeben:
+        Damit kannst du künftig einfach &room=FOH oder &case=R12
+        an eine URL hängen, ohne den HTML-Code zu ändern.
+      */
+      for (const [key, rawValue] of params.entries()) {
+        if (shown.has(key) || key === "reload") {
+          continue;
+        }
+
+        output.push(`
+          <div class="row">
+            <div class="label">${escapeHtml(key)}</div>
+            <div class="value">${escapeHtml(prettyValue(key, rawValue))}</div>
+          </div>
+        `);
+
+        shown.add(key);
+      }
+
+      if (output.length === 0) {
+        content.innerHTML = `
+          <div class="error">
+            Keine Kabeldaten in der URL gefunden.
+          </div>
+          <div class="hint">
+            Beispiel:
+            <code>?id=D004&amp;typ=CAT6A&amp;len=30m</code>
+          </div>
+        `;
         return;
       }
 
-      titleEl.textContent = name ? decodeURIComponent(name) : 'Kabel‑Info';
-
-      const rows = [];
-
-      if (signal) {
-        rows.push({
-          label: 'Signalweg',
-          text: decodeURIComponent(signal)
-        });
-      }
-      if (typ) {
-        rows.push({
-          label: 'Typ',
-          text: decodeURIComponent(typ)
-        });
-      }
-      if (laenge) {
-        rows.push({
-          label: 'Länge',
-          text: decodeURIComponent(laenge)
-        });
-      }
-      if (ziel) {
-        rows.push({
-          label: 'Ziel',
-          text: decodeURIComponent(ziel)
-        });
-      }
-      if (notiz) {
-        rows.push({
-          label: 'Notiz',
-          text: decodeURIComponent(notiz)
-        });
-      }
-
-      let html = '';
-      rows.forEach(r => {
-        html +=
-          '<div class="row">' +
-          '<span class="label">' + escapeHtml(r.label) + ':</span> ' +
-          escapeHtml(r.text) +
-          '</div>';
-      });
-
-      contentEl.innerHTML = html;
-    }
-
-    // Einfaches Escaping gegen XSS (für deine Nutzung ausreichend)
-    function escapeHtml(str) {
-      return str
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
+      content.innerHTML = output.join("");
     }
 
     render();
