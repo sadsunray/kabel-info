@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kabel‑Info</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      max-width: 500px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 18px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-size: 1.3rem;
+      margin: 0 0 10px 0;
+    }
+    .row {
+      margin: 6px 0;
+      line-height: 1.35;
+    }
+    .label {
+      font-weight: 600;
+      color: #444;
+    }
+    .error {
+      color: #b00020;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <h1 id="title">Lade…</h1>
+    <div id="content"></div>
+  </div>
+
+  <script>
+    // Hilfsfunktion: Query-Parameter auslesen
+    function getQueryParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    // Hauptlogik
+    function render() {
+      const name = getQueryParam('name');
+      const signal = getQueryParam('signal');
+      const typ = getQueryParam('typ');
+      const laenge = getQueryParam('laenge');
+      const ziel = getQueryParam('ziel');
+      const notiz = getQueryParam('notiz');
+
+      const titleEl = document.getElementById('title');
+      const contentEl = document.getElementById('content');
+
+      if (!name && !signal && !typ) {
+        titleEl.textContent = 'Keine Daten';
+        contentEl.innerHTML =
+          '<p class="error">Diese Seite erwartet URL‑Parameter, z. B.:<br>' +
+          '<code>?name=Kabel%20001&amp;signal=...&amp;typ=...</code></p>';
+        return;
+      }
+
+      titleEl.textContent = name ? decodeURIComponent(name) : 'Kabel‑Info';
+
+      const rows = [];
+
+      if (signal) {
+        rows.push({
+          label: 'Signalweg',
+          text: decodeURIComponent(signal)
+        });
+      }
+      if (typ) {
+        rows.push({
+          label: 'Typ',
+          text: decodeURIComponent(typ)
+        });
+      }
+      if (laenge) {
+        rows.push({
+          label: 'Länge',
+          text: decodeURIComponent(laenge)
+        });
+      }
+      if (ziel) {
+        rows.push({
+          label: 'Ziel',
+          text: decodeURIComponent(ziel)
+        });
+      }
+      if (notiz) {
+        rows.push({
+          label: 'Notiz',
+          text: decodeURIComponent(notiz)
+        });
+      }
+
+      let html = '';
+      rows.forEach(r => {
+        html +=
+          '<div class="row">' +
+          '<span class="label">' + escapeHtml(r.label) + ':</span> ' +
+          escapeHtml(r.text) +
+          '</div>';
+      });
+
+      contentEl.innerHTML = html;
+    }
+
+    // Einfaches Escaping gegen XSS (für deine Nutzung ausreichend)
+    function escapeHtml(str) {
+      return str
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    render();
+  </script>
+</body>
+</html>
